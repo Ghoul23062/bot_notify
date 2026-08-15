@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  bot_notify:
+    build: .
+    container_name: bot_notify_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./bot_notify.db:/app/bot_notify.db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
