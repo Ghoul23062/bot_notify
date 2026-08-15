@@ -72,17 +72,18 @@ async def cmd_cancel(message: Message, state: FSMContext):
 
 @router.callback_query(NavigationCallback.filter(F.target == "main_menu"))
 async def nav_main_menu(call: CallbackQuery, state: FSMContext, user: User):
-    """Return to main menu via callback."""
+    """Return to main menu via callback instantly acknowledging callback query."""
+    await call.answer()
     await state.clear()
     name = user.first_name or "друг"
     text = f"🏠 <b>Главное меню</b>\n\nЧем могу помочь, {name}?"
     await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_main_menu_keyboard())
-    await call.answer()
 
 
 @router.callback_query(NavigationCallback.filter(F.target == "help"))
 async def nav_help(call: CallbackQuery):
-    """Show help screen via callback."""
+    """Show help screen via callback instantly acknowledging callback query."""
+    await call.answer()
     help_text = (
         "❓ <b>СПРАВКА</b>\n\n"
         "Просто отправьте текст бота, например:\n"
@@ -91,12 +92,12 @@ async def nav_help(call: CallbackQuery):
         "Используйте кнопки меню для управления."
     )
     await call.message.edit_text(help_text, parse_mode="HTML", reply_markup=get_back_to_menu_keyboard())
-    await call.answer()
 
 
 @router.callback_query(NavigationCallback.filter(F.target == "create"))
 async def nav_create(call: CallbackQuery, state: FSMContext):
-    """Prompt user to write a reminder text."""
+    """Prompt user to write a reminder text instantly acknowledging callback query."""
+    await call.answer()
     await state.set_state(CreateReminderStates.waiting_for_text)
     msg = (
         "✍️ <b>Напишите напоминание</b>\n\n"
@@ -104,4 +105,3 @@ async def nav_create(call: CallbackQuery, state: FSMContext):
         "<i>«Завтра в 15:00 позвонить маме»</i> или <i>«Через 20 минут проверить духовку»</i>"
     )
     await call.message.edit_text(msg, parse_mode="HTML", reply_markup=get_back_to_menu_keyboard())
-    await call.answer()
