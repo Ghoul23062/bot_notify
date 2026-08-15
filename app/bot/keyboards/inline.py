@@ -1,5 +1,6 @@
 """Inline keyboard builders for bot screens and interactive actions."""
 
+from typing import List, Sequence
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -10,7 +11,9 @@ from app.bot.keyboards.callbacks import (
     ClarifyTimeCallback,
     SettingsCallback
 )
-from app.db.models import UserSettings
+from app.db.models import Reminder, UserSettings
+
+NUMBER_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 
 
 def get_main_menu_keyboard() -> InlineKeyboardMarkup:
@@ -75,31 +78,66 @@ def get_clarification_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_reminder_item_keyboard(reminder_id: int) -> InlineKeyboardMarkup:
-    """Build options for a single item in list view."""
+def get_reminders_list_keyboard(reminders: Sequence[Reminder], page: int = 0, per_page: int = 5, nav_target: str = "list") -> InlineKeyboardMarkup:
+    """Build selection grid allowing user to choose WHICH reminder to manage."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="✏️ Изменить", callback_data=ReminderActionCallback(action="edit_text", reminder_id=reminder_id))
-    builder.button(text="⏰ Перенести", callback_data=ReminderActionCallback(action="reschedule", reminder_id=reminder_id))
-    builder.button(text="🗑 Удалить", callback_data=ReminderActionCallback(action="delete", reminder_id=reminder_id))
-    builder.adjust(3)
+
+    start_idx = page * per_page
+    page_reminders = reminders[start_idx:start_idx + per_page]
+
+    # Item selection buttons [ 1️⃣ ] [ 2️⃣ ] [ 3️⃣ ]
+    row_buttons = []
+    for idx, r in enumerate(page_reminders):
+        icon = NUMBER_EMOJIS[idx] if idx < len(NUMBER_EMOJIS) else f"[{idx + 1}]"
+        builder.button(
+            text=f"{icon}",
+            callback_data=ReminderActionCallback(action="view_detail", reminder_id=r.id)
+        )
+        row_buttons.append(1)
+
+    builder.adjust(*row_buttons)
+
+    # Pagination controls if items > per_page
+    total_pages = (len(reminders) + per_page - 1) // per_page
+    if total_pages > 1:
+        pag_builder = InlineKeyboardBuilder()
+        if page > 0:
+            pag_builder.button(text="⬅️ Назад", callback_data=NavigationCallback(target=nav_target, page=page - 1))
+        pag_builder.button(text=f"Стр. {page + 1}/{total_pages}", callback_data=NavigationCallback(target="none"))
+        if page < total_pages - 1:
+            pag_builder.button(text="Вперёд ➡️", callback_data=NavigationCallback(target=nav_target, page=page + 1))
+        pag_builder.adjust(3)
+        builder.attach(pag_builder)
+
+    # Main menu button
+    menu_builder = InlineKeyboardBuilder()
+    menu_builder.button(text="🏠 Главное меню", callback_data=NavigationCallback(target="main_menu"))
+    builder.attach(menu_builder)
+
     return builder.as_markup()
 
 
-def get_recurring_item_keyboard(reminder_id: int, is_paused: bool) -> InlineKeyboardMarkup:
-    """Build options for a recurring reminder in list view."""
+def get_single_reminder_detail_keyboard(reminder_id: int, is_recurring: bool = False, is_paused: bool = False, back_target: str = "list") -> InlineKeyboardMarkup:
+    """Build management card for a SPECIFIC selected reminder."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="✏️ Изменить", callback_data=ReminderActionCallback(action="edit_text", reminder_id=reminder_id))
-    toggle_text = "▶️ Возобновить" if is_paused else "⏸ Приостановить"
-    builder.button(text=toggle_text, callback_data=ReminderActionCallback(action="toggle_pause", reminder_id=reminder_id))
+    builder.button(text="✏️ Изменить текст", callback_data=ReminderActionCallback(action="edit_text", reminder_id=reminder_id))
+
+    if is_recurring:
+        toggle_text = "▶️ Возобновить" if is_paused else "⏸ Приостановить"
+        builder.button(text=toggle_text, callback_data=ReminderActionCallback(action="toggle_pause", reminder_id=reminder_id))
+    else:
+        builder.button(text="⏰ Перенести время", callback_data=ReminderActionCallback(action="reschedule", reminder_id=reminder_id))
+
     builder.button(text="🗑 Удалить", callback_data=ReminderActionCallback(action="delete", reminder_id=reminder_id))
-    builder.adjust(3)
+    builder.button(text="⬅️ К списку", callback_data=NavigationCallback(target=back_target))
+    builder.adjust(2, 1, 1)
     return builder.as_markup()
 
 
 def get_settings_keyboard(settings: UserSettings) -> InlineKeyboardMarkup:
     """Build settings main screen inline keyboard."""
     builder = InlineKeyboardBuilder()
-    
+
     tz_text = f"🌍 Часовой пояс ({settings.timezone})"
     builder.button(text=tz_text, callback_data=SettingsCallback(action="tz"))
 
@@ -115,7 +153,7 @@ def get_settings_keyboard(settings: UserSettings) -> InlineKeyboardMarkup:
     builder.button(text=notif_text, callback_data=SettingsCallback(action="notifications_toggle"))
 
     builder.button(text="🌐 Язык (Русский)", callback_data=SettingsCallback(action="lang"))
-    
+
     fd_str = "Понедельник" if settings.first_day_of_week == 0 else "Воскресенье"
     builder.button(text=f"📅 Первый день ({fd_str})", callback_data=SettingsCallback(action="first_day"))
 
