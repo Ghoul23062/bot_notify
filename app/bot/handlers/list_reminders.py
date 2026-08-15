@@ -33,16 +33,16 @@ async def cmd_today(message: Message, user: User, user_tz: str, session: AsyncSe
 
 @router.callback_query(NavigationCallback.filter(F.target == "list"))
 async def nav_list(call: CallbackQuery, user: User, user_tz: str, session: AsyncSession):
-    """Show active reminders via callback navigation."""
-    await show_reminders_list(call, user.id, user_tz, session)
+    """Show active reminders via callback navigation immediately answering query."""
     await call.answer()
+    await show_reminders_list(call, user.id, user_tz, session)
 
 
 @router.callback_query(NavigationCallback.filter(F.target == "today"))
 async def nav_today(call: CallbackQuery, user: User, user_tz: str, session: AsyncSession):
-    """Show today's reminders via callback navigation."""
-    await show_today_reminders(call, user.id, user_tz, session)
+    """Show today's reminders via callback navigation immediately answering query."""
     await call.answer()
+    await show_today_reminders(call, user.id, user_tz, session)
 
 
 async def show_reminders_list(target, user_id: int, user_tz: str, session: AsyncSession):
@@ -102,7 +102,6 @@ async def show_reminders_list(target, user_id: int, user_tz: str, session: Async
     lines.append("<i>Для управления нажмите /list или выберите действие под уведомлением.</i>")
     full_text = "\n".join(lines)
 
-    # For the first item, provide action buttons for quick interaction
     first_rem_id = reminders[0].id
     reply_markup = get_reminder_item_keyboard(first_rem_id)
 
