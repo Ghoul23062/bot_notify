@@ -24,9 +24,9 @@ async def cmd_settings(message: Message, user: User):
 
 @router.callback_query(NavigationCallback.filter(F.target == "settings"))
 async def nav_settings(call: CallbackQuery, user: User):
-    """Show settings main screen via callback."""
-    await show_settings_screen(call, user)
+    """Show settings main screen via callback immediately answering query."""
     await call.answer()
+    await show_settings_screen(call, user)
 
 
 async def show_settings_screen(target, user: User):
@@ -54,7 +54,8 @@ async def show_settings_screen(target, user: User):
 
 @router.callback_query(SettingsCallback.filter(F.action == "tz"))
 async def callback_tz_prompt(call: CallbackQuery, state: FSMContext):
-    """Prompt user for timezone input."""
+    """Prompt user for timezone input immediately answering query."""
+    await call.answer()
     await state.set_state(SettingsStates.waiting_for_timezone_input)
     text = (
         "🌍 <b>Укажите ваш часовой пояс:</b>\n\n"
@@ -66,14 +67,12 @@ async def callback_tz_prompt(call: CallbackQuery, state: FSMContext):
         "• <code>UTC</code>"
     )
     await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_back_to_menu_keyboard())
-    await call.answer()
 
 
 @router.message(SettingsStates.waiting_for_timezone_input)
 async def process_tz_input(message: Message, state: FSMContext, user: User, session: AsyncSession):
     """Validate and update user timezone."""
     tz_input = message.text.strip()
-    # Friendly mapping for common Russian cities
     city_map = {
         "москва": "Europe/Moscow", "мск": "Europe/Moscow", "питер": "Europe/Moscow", "санкт-петербург": "Europe/Moscow",
         "екатеринбург": "Asia/Yekaterinburg", "новосибирск": "Asia/Novosibirsk", "красноярск": "Asia/Krasnoyarsk",
@@ -100,7 +99,7 @@ async def callback_quiet_hours_menu(call: CallbackQuery, user: User, session: As
     new_enabled = not s.quiet_hours_enabled
     await set_user_quiet_hours(session, user.id, enabled=new_enabled, start=s.quiet_start or "23:00", end=s.quiet_end or "07:00")
     user.settings.quiet_hours_enabled = new_enabled
-    status_str = "включены (23:00–07:00)" if new_enabled else "выключены"
+    status_str = "включены" if new_enabled else "выключены"
     await call.answer(f"Тихие часы {status_str}!")
     await show_settings_screen(call, user)
 
@@ -111,7 +110,7 @@ async def callback_time_fmt_toggle(call: CallbackQuery, user: User, session: Asy
     new_fmt = "12h" if user.settings.time_format == "24h" else "24h"
     await crud.update_user_settings(session, user.id, time_format=new_fmt)
     user.settings.time_format = new_fmt
-    await call.answer(f"Формат времени изменён на {new_fmt}!")
+    await call.answer(f"Формат изменён на {new_fmt}!")
     await show_settings_screen(call, user)
 
 
