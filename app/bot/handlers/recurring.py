@@ -25,9 +25,9 @@ async def cmd_repeat(message: Message, user: User, user_tz: str, session: AsyncS
 
 @router.callback_query(NavigationCallback.filter(F.target == "recurring"))
 async def nav_recurring(call: CallbackQuery, user: User, user_tz: str, session: AsyncSession):
-    """Show recurring reminders via callback navigation."""
-    await show_recurring_reminders(call, user.id, user_tz, session)
+    """Show recurring reminders via callback navigation immediately answering query."""
     await call.answer()
+    await show_recurring_reminders(call, user.id, user_tz, session)
 
 
 async def show_recurring_reminders(target, user_id: int, user_tz: str, session: AsyncSession):
@@ -87,14 +87,11 @@ def format_rrule_description(rule: str, time_str: str) -> str:
 @router.callback_query(ReminderActionCallback.filter(F.action == "toggle_pause"))
 async def callback_toggle_pause(call: CallbackQuery, callback_data: ReminderActionCallback, user_tz: str, session: AsyncSession):
     """Pause or resume a recurring reminder."""
+    await call.answer("Обрабатывается...")
     reminder = await crud.get_reminder_by_id(session, callback_data.reminder_id)
     if not reminder:
-        await call.answer("⚠️ Напоминание не найдено.", show_alert=True)
         return
 
     new_status = "ACTIVE" if reminder.status == "PAUSED" else "PAUSED"
     await crud.update_reminder_status(session, reminder.id, new_status)
-
-    status_str = "возобновлено ▶️" if new_status == "ACTIVE" else "приостановлено ⏸"
-    await call.answer(f"Напоминание {status_str}!")
     await show_recurring_reminders(call, reminder.user_id, user_tz, session)
