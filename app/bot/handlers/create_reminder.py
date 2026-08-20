@@ -1,18 +1,20 @@
-"""Handlers for natural language reminder creation, confirmation, clarification, and context modifications."""
+"""Handlers for natural language reminder creation, voice notes, confirmation, clarification, and context modifications."""
 
 import datetime
 import logging
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db import crud
 from app.db.models import User
 from app.utils.datetime_utils import utc_now, to_local, to_utc, format_russian_datetime
 from app.services.parser import parse_reminder_input
 from app.services.reminder_service import create_new_reminder, reschedule_last_context_reminder
+from app.services.voice_service import download_voice_file, transcribe_voice
 from app.bot.keyboards.inline import (
     get_confirmation_keyboard,
     get_clarification_keyboard,
@@ -32,10 +34,43 @@ async def cmd_remind(message: Message, state: FSMContext, user: User, user_tz: s
     text = message.text.partition(" ")[2].strip()
     if not text:
         await state.set_state(CreateReminderStates.waiting_for_text)
-        await message.answer("✍️ Напишите, о чём и когда вас напомнить:", reply_markup=get_back_to_menu_keyboard())
+        await message.answer("✍️ Напишите или наговорите голосовым, о чём и когда вам напомнить:", reply_markup=get_back_to_menu_keyboard())
         return
 
     await process_reminder_text(message, text, state, user, user_tz)
+
+
+@router.message(F.voice | F.audio)
+async def handle_voice_input(message: Message, bot: Bot, state: FSMContext, user: User, user_tz: str):
+    """Handle incoming Telegram voice notes and audio messages."""
+    await bot.send_chat_action(message.chat.id, action="typing")
+    file_id = message.voice.file_id if message.voice else message.audio.file_id
+
+    try:
+        audio_bytes = await download_voice_file(bot, file_id)
+        transcribed_text = await transcribe_voice(audio_bytes)
+
+        if not transcribed_text:
+            if not (settings.ai_api_key or settings.groq_api_key):
+                msg = (
+                    "🎙 <b>Голосовое сообщение получено!</b>\n\n"
+                    "Для включения распознавания голоса добавьте ключ <code>GROQ_API_KEY</code> или <code>AI_API_KEY</code> в настройках Render (Environment Variables).\n\n"
+                    "Вы также можете написать напоминание текстом!"
+                )
+            else:
+                msg = "⚠️ Не удалось разобрать слова на аудио. Попробуйте записать ещё раз чётче или напишите текстом."
+            await message.answer(msg, parse_mode="HTML", reply_markup=get_main_menu_keyboard())
+            return
+
+        # Show user what was transcribed
+        await message.answer(f"🎙 <i>Распознано:</i> «<b>{transcribed_text}</b>»", parse_mode="HTML")
+
+        # Process transcribed text just like regular message
+        await process_reminder_text(message, transcribed_text, state, user, user_tz)
+
+    except Exception as e:
+        logger.error(f"Error handling voice message: {e}", exc_info=True)
+        await message.answer("⚠️ Ошибка при обработке голосового сообщения. Попробуйте отправить текстом.")
 
 
 @router.message(F.text & ~F.text.startswith("/"))
