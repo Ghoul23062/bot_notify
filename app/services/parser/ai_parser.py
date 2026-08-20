@@ -39,7 +39,7 @@ Return ONLY valid JSON.
 """
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             if settings.ai_provider == "openai":
                 response = await client.post(
                     "https://api.openai.com/v1/chat/completions",
@@ -52,8 +52,8 @@ Return ONLY valid JSON.
                 )
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
-            else:  # Gemini REST API default
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.ai_api_key}"
+            else:  # Gemini REST API default (gemini-flash-latest)
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={settings.ai_api_key}"
                 response = await client.post(
                     url,
                     json={
