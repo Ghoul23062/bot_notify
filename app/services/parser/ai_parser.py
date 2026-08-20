@@ -52,8 +52,8 @@ Return ONLY valid JSON.
                 )
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
-            else:  # Gemini REST API default (gemini-flash-latest)
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={settings.ai_api_key}"
+            else:  # Gemini REST API default (gemini-3.1-flash-lite-preview)
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={settings.ai_api_key}"
                 response = await client.post(
                     url,
                     json={
