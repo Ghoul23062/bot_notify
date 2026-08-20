@@ -136,7 +136,7 @@ async def callback_edit_reminder_text(call: CallbackQuery, callback_data: Remind
     await call.answer()
     await state.set_state(CreateReminderStates.waiting_for_edit_text)
     await state.update_data({"edit_reminder_id": callback_data.reminder_id})
-    await call.message.edit_text("✏️ Введите новый текст для напоминания:", reply_markup=get_main_menu_keyboard())
+    await call.message.edit_text("✏️ Введите новый текст для напоминания:", reply_markup=get_back_to_menu_keyboard())
 
 
 @router.callback_query(ReminderActionCallback.filter(F.action == "reschedule"))
@@ -145,4 +145,4 @@ async def callback_reschedule_reminder(call: CallbackQuery, callback_data: Remin
     await call.answer()
     await state.set_state(CreateReminderStates.waiting_for_edit_time)
     await state.update_data({"edit_reminder_id": callback_data.reminder_id})
-    await call.message.edit_text("⏰ Напишите новое время (например: <i>«завтра в 19:00»</i>):", parse_mode="HTML")
+    await call.message.edit_text("⏰ Напишите новое время (например: <i>«завтра в 19:00»</i>):", parse_mode="HTML", reply_markup=get_back_to_menu_keyboard())
