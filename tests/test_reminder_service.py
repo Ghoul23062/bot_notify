@@ -12,7 +12,7 @@ from app.services.reminder_service import (
     snooze_reminder,
     reschedule_last_context_reminder
 )
-from app.utils.datetime_utils import utc_now
+from app.utils.datetime_utils import utc_now, to_utc
 
 
 @pytest.mark.asyncio
@@ -33,6 +33,26 @@ async def test_create_and_fetch_reminder(test_db_session: AsyncSession, test_use
     fetched = await crud.get_reminder_by_id(test_db_session, reminder.id)
     assert fetched is not None
     assert fetched.text == "Позвонить маме"
+
+
+@pytest.mark.asyncio
+async def test_update_reminder_text_and_reschedule(test_db_session: AsyncSession, test_user: User):
+    target_dt_local = datetime.datetime(2026, 8, 16, 15, 0, 0)
+    reminder = await create_new_reminder(
+        session=test_db_session,
+        user=test_user,
+        text="Старый текст",
+        target_dt_local=target_dt_local
+    )
+
+    # Update text
+    updated_text = await crud.update_reminder_text(test_db_session, reminder.id, "Напомни отключить подписку глово")
+    assert updated_text.text == "Напомни отключить подписку глово"
+
+    # Reschedule
+    new_due_utc = to_utc(datetime.datetime(2026, 8, 17, 19, 0, 0), "Europe/Moscow")
+    updated_due = await crud.update_reminder_due_at(test_db_session, reminder.id, new_due_utc, status="ACTIVE")
+    assert updated_due.due_at == new_due_utc
 
 
 @pytest.mark.asyncio
