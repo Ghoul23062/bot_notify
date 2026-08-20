@@ -30,7 +30,7 @@ async def transcribe_voice(audio_bytes: bytes) -> Optional[str]:
     Order of priority:
       1. Groq Whisper (Whisper-large-v3, ultra-fast)
       2. OpenAI Whisper
-      3. Google Gemini Flash (Multimodal Audio)
+      3. Google Gemini Flash Lite (Multimodal Audio)
       4. Google Free Speech API fallback
     """
     # 1. Try Groq Whisper (Whisper Large v3)
@@ -50,6 +50,8 @@ async def transcribe_voice(audio_bytes: bytes) -> Optional[str]:
                     text = res.json().get("text", "").strip()
                     if text:
                         return text
+                else:
+                    logger.warning(f"Groq status {res.status_code}: {res.text}")
         except Exception as e:
             logger.warning(f"Groq whisper transcription error: {e}")
 
@@ -69,33 +71,41 @@ async def transcribe_voice(audio_bytes: bytes) -> Optional[str]:
                     text = res.json().get("text", "").strip()
                     if text:
                         return text
+                else:
+                    logger.warning(f"OpenAI status {res.status_code}: {res.text}")
         except Exception as e:
             logger.warning(f"OpenAI whisper transcription error: {e}")
 
-    # 3. Try Gemini Multimodal Audio (Gemini Flash)
+    # 3. Try Gemini Multimodal Audio (Gemini 3.1 Flash Lite)
     if settings.ai_api_key and settings.ai_provider in ["gemini", "default"]:
         try:
             b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
-            prompt = "Точно расшифруй аудиозапись на русском языке. Верни ТОЛЬКО текст того, что сказано вслух, без лишних пояснений."
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={settings.ai_api_key}"
+            prompt = "Точно расшифруй аудиозапись на русском языке. Верни ТОЛЬКО текст того, что сказано вслух, без лишних пояснений и без кавычек."
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={settings.ai_api_key}"
 
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 payload = {
                     "contents": [{
                         "parts": [
                             {"text": prompt},
-                            {"inline_data": {"mime_type": "audio/ogg", "data": b64_audio}}
+                            {"inlineData": {"mimeType": "audio/ogg", "data": b64_audio}}
                         ]
                     }]
                 }
                 res = await client.post(url, json=payload)
                 if res.status_code == 200:
                     data = res.json()
-                    text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    if text:
-                        return text
+                    candidates = data.get("candidates", [])
+                    if candidates and len(candidates) > 0:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and len(parts) > 0:
+                            text = parts[0].get("text", "").strip()
+                            if text:
+                                return text
+                else:
+                    logger.warning(f"Gemini API error {res.status_code}: {res.text}")
         except Exception as e:
-            logger.warning(f"Gemini audio transcription error: {e}")
+            logger.warning(f"Gemini audio transcription error: {e}", exc_info=True)
 
     # 4. Try Google Free Speech API fallback
     free_result = await _transcribe_google_free(audio_bytes)
