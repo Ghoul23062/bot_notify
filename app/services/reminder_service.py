@@ -95,13 +95,23 @@ async def create_new_reminder(
 
 async def mark_reminder_completed(session: AsyncSession, reminder_id: int, user_tz: str) -> Optional[Reminder]:
     """
-    Mark reminder completed. If recurring, schedule the next occurrence.
+    Mark reminder completed. If recurring, ensure next occurrence is scheduled.
+    Avoids double-advancing if scheduler already advanced due_at upon delivery.
     """
     reminder = await crud.get_reminder_by_id(session, reminder_id)
     if not reminder:
         return None
 
+    now_utc = utc_now()
+
     if reminder.is_recurring and reminder.recurrence_rule:
+        # If due_at is already in the future and active (i.e. scheduler already advanced it upon sending notification)
+        if reminder.due_at > now_utc and reminder.status == "ACTIVE":
+            reminder.completed_at = now_utc
+            await session.commit()
+            return reminder
+
+        # If due_at is in the past, currently due, or snoozed, advance to next occurrence
         next_due_utc = calculate_next_occurrence(reminder.due_at, reminder.recurrence_rule, user_tz)
         if next_due_utc:
             # Check if recurrence end date reached
