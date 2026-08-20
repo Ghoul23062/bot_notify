@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./bot_notify.db"
     
     ai_api_key: Optional[str] = None
-    ai_provider: str = "gemini"  # "gemini" or "openai"
+    ai_provider: str = "gemini"  # "gemini", "openai", "groq"
+    groq_api_key: Optional[str] = None
     
     default_timezone: str = "Europe/Moscow"
     log_level: str = "INFO"
