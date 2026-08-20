@@ -1,16 +1,17 @@
 """Application configuration using Pydantic Settings."""
 
+import os
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    bot_token: str = "123456789:YOUR_TELEGRAM_BOT_TOKEN"
+    bot_token: str = "8946298463:AAG4vUsGb__1Gx7pM-MWRPK8LR3cqitoOHA"
     database_url: str = "sqlite+aiosqlite:///./bot_notify.db"
     
-    ai_api_key: Optional[str] = None
+    ai_api_key: Optional[str] = os.environ.get("AI_API_KEY")
     ai_provider: str = "gemini"  # "gemini", "openai", "groq"
-    groq_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = os.environ.get("GROQ_API_KEY")
     
     default_timezone: str = "Europe/Moscow"
     log_level: str = "INFO"
